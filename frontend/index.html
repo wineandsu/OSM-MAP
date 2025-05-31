@@ -1,0 +1,492 @@
+<!doctype html>
+<html>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .myButton {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+      </style>
+      <title> kitakitaqwj</title>
+     <button id="button1" class="myButton">dijistra_basic</button>
+    <button id="button2" class="myButton">dijistra_choose</button>
+    <button id="button3" class="myButton">A*</button>
+    <button id="button4" class="myButton">clear</button>
+    <link rel="stylesheet" href="styles.css">
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="输入搜索内容" oninput="showSuggestions()">
+      <button onclick="performSearch()">搜索</button>
+      <div id="suggestions"></div>
+  </div>
+
+<canvas id="test" width="5000" height="5000"></canvas>
+<script>
+    var choosemethod="a";
+
+    var scale = function (point) {
+        // 对经纬度值进行缩放，自行修改,lon是宽度
+        return [Math.round((point.lon - 121.4778) * 100000), Math.round((point.lat - 31.2858) * 100000)]
+    }
+    var draww = function (data) {
+        let points = data.nodes
+        // tags可以用来确定如何画这个way，自行设计
+
+        let test = document.getElementById("test")
+        let way = test.getContext("2d")
+        way.lineWidth = 2
+        way.strokeStyle = "#FF00CC"
+        way.beginPath()
+        let point = scale(points[0])
+        way.moveTo(point[0], point[1])
+        for (let i = 1; i < points.length; i++) {
+            let point = scale(points[i])
+            way.lineTo(point[0], point[1])
+        }
+        way.stroke()
+    }
+
+    var draw = function (data) {
+    let points = data.nodes;
+    let tags = data.tags;
+
+    let test = document.getElementById("test");
+    let way = test.getContext("2d");
+    way.lineWidth = 1;
+    way.beginPath();
+
+    function drawCommon(fillStyle, strokeStyle) {
+        way.fillStyle = fillStyle;
+        way.strokeStyle = strokeStyle;
+
+        let point = scale(points[0]);
+        way.moveTo(point[0], point[1]);
+
+        for (let i = 1; i < points.length; i++) {
+            let point = scale(points[i]);
+            way.lineTo(point[0], point[1]);
+        }
+
+        way.closePath();
+        way.fill();
+        way.stroke();
+    }
+
+    function drawnotf(strokeStyle) {
+        way.strokeStyle = strokeStyle;
+
+        let point = scale(points[0]);
+        way.moveTo(point[0], point[1]);
+
+        for (let i = 1; i < points.length; i++) {
+            let point = scale(points[i]);
+            way.lineTo(point[0], point[1]);
+        }
+        way.stroke();
+    }
+
+    function drawway(strokeStyle) {
+        way.strokeStyle = "strokeStyle";
+        way.lineWidth=5;
+
+        let point = scale(points[0]);
+        way.moveTo(point[0], point[1]);
+
+        for (let i = 1; i < points.length; i++) {
+            let point = scale(points[i]);
+            way.lineTo(point[0], point[1]);
+        }
+        way.stroke();
+    }
+    
+    if (tags){
+        if (tags.building||tags.office||tags.amenity==="hospital") {
+            drawCommon("#CCCCCC", "#000000");
+        } else if (tags.leisure) {
+            drawCommon("#99FF99", "#000000");
+        } else if (tags.landuse) {
+            if(tags.landuse==="grass"||tags.landuse==="forest"
+            ||tags.landuse==="greenfield"||tags.landuse==="meadow")
+            drawCommon("#99FF99", "#000000");
+            else if(tags.landuse==="residential")
+            drawCommon("#CCCCCC", "#000000");
+            else
+            drawnotf("#000000");
+        } else if (tags.water || tags.waterway || tags.natural==="water") {
+            if(tags.waterway)
+            drawway("#00CCCC");
+            else
+            drawCommon("#00CCCC", "#000000");
+        }
+        else if(tags.amenity){
+            if(tags.amenity==="parking")
+            drawCommon("#808080","#000000");
+        }
+          else if(tags.highway){//||tags.oneway
+            way.lineWidth = 5;
+            way.strokeStyle = "#000000";
+            let point = scale(points[0]);
+            way.moveTo(point[0], point[1]);
+            for (let i = 1; i < points.length; i++) {
+                let point = scale(points[i]);
+                way.lineTo(point[0], point[1]);
+            }
+            way.stroke();
+            way.lineWidth = 3;
+            way.strokeStyle = "#FFFFFF";
+            point = scale(points[0]);
+            way.moveTo(point[0], point[1]);
+
+            for (let i = 1; i < points.length; i++) {
+                let point = scale(points[i]);
+                way.lineTo(point[0], point[1]);
+            }
+            way.stroke();
+        } 
+        /*
+        else {
+            way.lineWidth=1;
+            // 默认情况
+            way.strokeStyle = "#000000";
+            let point = scale(points[0]);
+            way.moveTo(point[0], point[1]);
+
+            for (let i = 1; i < points.length; i++) {
+                let point = scale(points[i]);
+                way.lineTo(point[0], point[1]);
+            }
+
+            way.stroke();
+        }*/
+    }
+}
+    var canvas = document.getElementById("test");
+    var context = canvas.getContext("2d");
+   
+   var Module = {
+    waysData: null,  // 保存数据的属性
+    ans: null,
+    names:null,
+    // Module 调用的函数 load 和 getWays 均为 test.cpp 中定义好的
+    onRuntimeInitialized: function () {
+        if (!Module.waysData) {
+            // 如果数据还未加载，则加载数据
+            Module.load();
+            let jsondata = Module.getWays();
+            let jsondata2=Module.getnames();
+            //let tem = Module.getans();
+
+            // 解析 json 数据
+            Module.waysData = JSON.parse(jsondata);
+            Module.names=JSON.parse(jsondata2);
+            //Module.ans = JSON.parse(tem);
+        }
+         //console.log(Module.names); // 输出数组元素
+        // 使用保存的数据进行绘制
+        for (let data in Module.waysData) {
+           // console.log(Module.waysData[data]);
+            draw(Module.waysData[data]);
+        }
+       // draww(Module.ans);
+    }
+};
+    var clickCount=-1;
+    let savepoints=[];
+    function drawCircle(x, y,jud) {
+    clickCount++;
+    if (clickCount === 3||jud==4) {
+        // 清空画布
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        if(jud==4)
+        clickCount=-1;
+        else
+        clickCount = 0; // 重置点击次数
+        if (Module.waysData) {
+            for (let data in Module.waysData) {
+              //  console.log(Module.waysData[data]);
+                draw(Module.waysData[data]);
+            }
+        }
+        return;
+    }
+    if(clickCount===0){
+        return ;
+    }
+    
+
+    // 获取Canvas元素在文档中的偏移
+    var canvasRect = canvas.getBoundingClientRect();
+   
+    // 将鼠标点击坐标转换为Canvas坐标
+    var canvasX = x - canvasRect.left;
+    var canvasY = y - canvasRect.top;
+    canvasY = 5000 - canvasY;
+
+    // 绘制黄色小圆
+    context.beginPath();
+    context.arc(canvasX, canvasY, 3, 0, 2 * Math.PI);
+    context.fillStyle = "red";
+    context.fill();
+    context.closePath();
+    // 反向转换为经纬度坐标
+    var lat = (canvasX / 100000) + 121.4778;
+    var lon = (canvasY / 100000) + 31.2858;
+   // console.log("Clicked Coordinates (lon, lat):", lon, lat);
+    if(savepoints.length==0){
+      savepoints[0]={lon,lat};
+    }
+    else if(savepoints.length==1){
+      savepoints[1]={lon,lat};
+    }
+
+    let arrayLength = savepoints.length;
+    //console.log("Array Length:", arrayLength);
+    if(clickCount===2){
+       var jsondata;
+
+        if(jud==1){
+        jsondata=Module.dijistra_(savepoints[0].lon,savepoints[0].lat,
+        savepoints[1].lon,savepoints[1].lat); 
+        }
+        else if(jud==2){
+         jsondata=Module.dijistra_r(savepoints[0].lon,savepoints[0].lat,
+         savepoints[1].lon,savepoints[1].lat,choosemethod); 
+        }
+        else{
+           jsondata=Module.astar(savepoints[0].lon,savepoints[0].lat,
+           savepoints[1].lon,savepoints[1].lat,choosemethod); 
+        }
+
+        if (jsondata[0]!="error") {
+    try {
+        let dijiway = JSON.parse(jsondata);
+        let keys = Object.keys(dijiway);
+
+        if (keys.length === 0) {
+            console.log("dijiway is empty");
+        } else {
+            for (let data in dijiway) {
+                //console.log(dijiway[data]);
+            }
+            draww(dijiway);
+        }
+    } catch (error) {
+        console.error("Error parsing JSON:", error);
+    }
+} else {
+    console.error("jsondata is undefined or null");
+}
+
+    savepoints.length = 0;
+    }
+}
+
+
+    //button1
+    var myButton1 = document.getElementById('button1');
+    var click_b_1 = 0;
+    var dijilisten = function (event) {
+      // 获取鼠标点击位置的坐标
+      var mouseX = event.clientX;
+      var mouseY = event.clientY;
+
+      drawCircle(mouseX, mouseY,1);
+    };
+    // 定义点击事件的处理函数
+    function handleClickdiji() {
+      click_b_1++;
+
+      if (click_b_1%2== 1) {
+        // 第一次点击触发功能
+        alert('第一次点击，触发功能！');
+        document.addEventListener("click", dijilisten);
+      } else if (click_b_1%2 == 0) {
+        // 第二次点击取消事件监听器
+        alert('第二次点击，取消事件监听器！');
+        clickCount=-1;
+        click_b_1=0;
+        document.removeEventListener('click', dijilisten);
+      }
+    }
+    myButton1.addEventListener('click', handleClickdiji);
+    
+    var myButton2 = document.getElementById('button2');
+    var click_b_2 = 0;
+    var dijirlisten = function (event) {
+      // 获取鼠标点击位置的坐标
+      var mouseX = event.clientX;
+      var mouseY = event.clientY;
+
+      drawCircle(mouseX, mouseY,2);
+    };
+    // 定义点击事件的处理函数
+    function handleClickdijir() {
+      click_b_2++;
+
+      if (click_b_2%2== 1) {
+        // 第一次点击触发功能
+        alert('第一次点击，触发功能！');
+        var userInput = prompt('请输入出行方式(输入选项标号): a.car b.bicycle c.foot', '');
+
+      // 处理用户输入
+      if (userInput !== null) {
+       choosemethod=userInput;
+      } else {
+        alert('您取消了输入。默认出行为car');
+        choosemethod="a";
+      }
+        document.addEventListener("click", dijirlisten);
+      } else if (click_b_2%2 == 0) {
+        // 第二次点击取消事件监听器
+        alert('第二次点击，取消功能！');
+        clickCount=-1;
+        click_b_2=0;
+        document.removeEventListener('click', dijirlisten);
+      }
+    }
+    myButton2.addEventListener('click', handleClickdijir);
+
+    var myButton3 = document.getElementById('button3');
+    var click_b_3 = 0;
+    var astarlisten = function (event) {
+      // 获取鼠标点击位置的坐标
+      var mouseX = event.clientX;
+      var mouseY = event.clientY;
+
+      drawCircle(mouseX, mouseY,3);
+    };
+    // 定义点击事件的处理函数
+    function handleClickastar() {
+      click_b_3++;
+
+      if (click_b_3%2== 1) {
+        // 第一次点击触发功能
+        alert('第一次点击，触发功能！');
+        var userInput = prompt('请输入出行方式(输入选项标号): a.car b.bicycle c.foot', '');
+        if (userInput !== null) {
+       choosemethod=userInput;
+      } else {
+        alert('您取消了输入。默认出行为car');
+        choosemethod="a";
+      }
+        document.addEventListener("click", astarlisten);
+      } else if (click_b_3%2 == 0) {
+        // 第二次点击取消事件监听器
+        alert('第二次点击，取消功能！');
+        clickCount=-1;
+        click_b_3=0;
+        document.removeEventListener('click', astarlisten);
+      }
+    }
+    myButton3.addEventListener('click', handleClickastar);
+    
+    var myButton4 = document.getElementById('button4');
+    // 定义点击事件的处理函数
+    function handleClickclear() {
+      var mouseX = event.clientX;
+      var mouseY = event.clientY;
+      drawCircle(mouseX, mouseY,4);
+      alert('清除并置零完毕！');
+    }
+    myButton4.addEventListener('click', handleClickclear);
+
+    function showSuggestions() {
+    var input = document.getElementById('searchInput');
+    var suggestionsContainer = document.getElementById('suggestions');
+    var inputValue = input.value.toLowerCase();
+
+    // 清空之前的建议
+    suggestionsContainer.innerHTML = '';
+
+    // 根据输入的值生成匹配的关键词列表
+    var matchingKeywords = Module.names.filter(function(keyword) {
+        // 添加额外的检查，确保只有字符串调用 toLowerCase
+        return typeof keyword === 'string' && keyword.toLowerCase().includes(inputValue);
+    });
+
+    // 显示匹配的关键词
+    matchingKeywords.forEach(function(keyword) {
+        var suggestionElement = document.createElement('div');
+        suggestionElement.textContent = keyword;
+        suggestionElement.addEventListener('click', function() {
+            // 点击关键词时，将其填充到搜索框中
+            input.value = keyword;
+            // 清空建议列表
+            suggestionsContainer.innerHTML = '';
+        });
+        suggestionsContainer.appendChild(suggestionElement);
+    });
+}
+function scrollToCenter(x, y) {
+        // 获取视口宽度和高度
+        var viewportWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+        var viewportHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+
+        // 计算滚动位置，使指定坐标位于页面中心
+        var scrollToX = x - viewportWidth / 2;
+        var scrollToY = y - viewportHeight / 2;
+
+        // 调用 window.scrollTo() 方法，将页面滚动到计算得到的坐标位置
+        window.scrollTo({
+            top: scrollToY,
+            left: scrollToX,
+            behavior: "smooth" // 使用平滑滚动效果
+        });
+    }
+let save=[];
+function performSearch() {
+    // 获取输入框的值
+    var searchQuery = document.getElementById('searchInput').value;
+    save.push(searchQuery);
+    console.log(save);
+    let jsondata=Module.mysearchhandle(searchQuery);
+    let location=JSON.parse(jsondata);
+    if(location.length===2){
+      if(clickCount==-1)
+       clickCount++;
+      // 获取Canvas元素在文档中的偏移
+    location[0]=(location[0]- 121.4778) * 100000;
+    location[1]=(location[1] - 31.2858) * 100000;
+
+    var canvasRect = canvas.getBoundingClientRect();
+    location[0]=location[0]+canvasRect.left;
+    location[1]=5000-location[1]+canvasRect.top;
+      drawCircle(location[0],location[1],1);
+    }
+    else{
+      console.log("error");
+    }
+
+    scrollToCenter(location[0],location[1]);
+     
+    
+    if(save.length==2){
+      save.length=0;
+      clickCount=-1;
+    }
+}
+
+function displaySearchResults(results) {
+    var resultsContainer = document.getElementById('searchResults');
+    // 清空之前的结果
+    resultsContainer.innerHTML = '';
+
+    // 显示新的搜索结果
+    for (var i = 0; i < results.length; i++) {
+        var resultElement = document.createElement('p');
+        resultElement.textContent = results[i];
+        resultsContainer.appendChild(resultElement);
+    }
+}
+
+// 移动画布到新的位置，以确保翻转后的内容显示在画布上
+    canvas.style.backgroundColor="#FFFFCC"
+    // 在垂直方向上翻转
+    context.scale(1, -1);
+    context.translate(0, -canvas.height);
+</script>
+<!-- test.js是test.cpp编译后生成的 -->
+<script src="test.js"></script>
+</html>
